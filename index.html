@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>StreetShot — Cook County PIN Lookup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:      #0d0c0b;
+      --surface: #161412;
+      --border:  #2a2520;
+      --tan:     #c8b89a;
+      --rust:    #b05c32;
+      --gold:    #d4a843;
+      --text:    #e8e0d0;
+      --muted:   #6a6058;
+      --green:   #4a8c5c;
+      --red:     #9c3c2c;
+      --r:       5px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'IBM Plex Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      padding: 28px 48px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 20px;
+    }
+    .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      color: var(--text);
+    }
+    .logo em { font-style: italic; color: var(--gold); }
+    .sub {
+      font-size: 9px;
+      letter-spacing: 0.28em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    /* ── MAIN ── */
+    main {
+      flex: 1;
+      max-width: 860px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 48px 24px 64px;
+    }
+
+    .section-title {
+      font-size: 9px;
+      letter-spacing: 0.3em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    /* ── PIN CARDS ── */
+    .pin-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 36px;
+    }
+
+    .pin-card {
+      display: grid;
+      grid-template-columns: 180px 1fr auto;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 14px 18px;
+      transition: border-color 0.2s;
+    }
+    .pin-card:focus-within { border-color: var(--tan); }
+
+    .pin-label {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+    .pin-label strong {
+      display: block;
+      font-size: 12px;
+      color: var(--text);
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+
+    .pin-input {
+      padding: 10px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 14px;
+      letter-spacing: 0.12em;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+    .pin-input::placeholder { color: #3a3530; letter-spacing: 0.08em; }
+    .pin-input:focus { border-color: var(--tan); }
+    .pin-input.valid   { border-color: var(--green); }
+    .pin-input.invalid { border-color: var(--red); }
+
+    .pin-status {
+      width: 120px;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pin-status.ok      { color: var(--green); }
+    .pin-status.err     { color: var(--red); }
+    .pin-status.loading { color: var(--gold); }
+
+    /* ── DIVIDER ── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 8px 0 28px;
+    }
+
+    /* ── ACTIONS ── */
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 13px 28px;
+      border: none;
+      border-radius: var(--r);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn:hover:not(:disabled) { opacity: 0.85; }
+
+    .btn-primary {
+      background: var(--rust);
+      color: #fff;
+    }
+    .btn-secondary {
+      background: transparent;
+      color: var(--tan);
+      border: 1px solid var(--border);
+    }
+
+    /* ── PROGRESS ── */
+    .progress-wrap {
+      display: none;
+      margin-top: 32px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .progress-wrap.active { display: block; }
+
+    .progress-bar-track {
+      height: 3px;
+      background: var(--border);
+    }
+    .progress-bar-fill {
+      height: 3px;
+      background: var(--gold);
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    .progress-steps {
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .step-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+    .step-row.active  { color: var(--gold); }
+    .step-row.done    { color: var(--green); }
+    .step-row.failed  { color: var(--red); }
+    .step-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    /* ── RESULT ── */
+    .result-bar {
+      display: none;
+      margin-top: 28px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 16px 20px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .result-bar.visible { display: flex; }
+    .result-info { font-size: 11px; letter-spacing: 0.06em; }
+    .result-info span { color: var(--green); }
+
+    /* ── GLOBAL STATUS ── */
+    .global-status {
+      margin-top: 16px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      min-height: 18px;
+      color: var(--muted);
+    }
+    .global-status.err  { color: var(--red); }
+    .global-status.warn { color: var(--gold); }
+    .global-status.ok   { color: var(--green); }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 18px 48px;
+      border-top: 1px solid var(--border);
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Street<em>Shot</em></div>
+  <div class="sub">Cook County PIN · Street View · PDF Generator</div>
+</header>
+
+<main>
+  <p class="section-title">Enter 14-digit PINs (with or without dashes)</p>
+
+  <div class="pin-grid" id="pinGrid">
+    <!-- generated by JS -->
+  </div>
+
+  <hr class="divider"/>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="generateBtn" onclick="generatePDF()">
+      Generate PDF
+    </button>
+    <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
+  </div>
+
+  <div class="global-status" id="globalStatus"></div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-steps" id="progressSteps"></div>
+  </div>
+
+  <!-- Result download bar -->
+  <div class="result-bar" id="resultBar">
+    <div class="result-info" id="resultInfo"></div>
+    <button class="btn btn-primary" id="dlBtn" onclick="downloadPDF()">↓ Download PDF</button>
+  </div>
+</main>
+
+<footer>StreetShot &mdash; Cook County Assessor Data + InstantStreetView.com</footer>
+
+<script>
+  const PROPERTIES = [
+    { id: "subject",  label: "Subject Property", badge: "S" },
+    { id: "comp1",    label: "Comparable 1",      badge: "1" },
+    { id: "comp2",    label: "Comparable 2",      badge: "2" },
+    { id: "comp3",    label: "Comparable 3",      badge: "3" },
+    { id: "comp4",    label: "Comparable 4",      badge: "4" },
+  ];
+
+  let pdfBlob = null;
+  let lookupTimers = {};
+
+  // ── Build UI ──────────────────────────────────────────────────────────────
+  function buildGrid() {
+    const grid = document.getElementById('pinGrid');
+    grid.innerHTML = '';
+    PROPERTIES.forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'pin-card';
+      card.innerHTML = `
+        <div class="pin-label">
+          <strong>${p.label}</strong>
+          <span>14-digit PIN</span>
+        </div>
+        <input
+          class="pin-input"
+          id="pin_${p.id}"
+          type="text"
+          placeholder="XX-XX-XXX-XXX-XXXX"
+          maxlength="17"
+          autocomplete="off"
+          oninput="onPinInput('${p.id}')"
+          onblur="validatePin('${p.id}')"
+        />
+        <div class="pin-status" id="status_${p.id}"></div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  buildGrid();
+
+  // ── PIN Formatting ─────────────────────────────────────────────────────────
+  function stripPin(v) { return v.replace(/[-\s]/g, ''); }
+
+  function formatPin(digits) {
+    // Format as XX-XX-XXX-XXX-XXXX
+    const d = digits.padEnd(14, '_');
+    return `${d.slice(0,2)}-${d.slice(2,4)}-${d.slice(4,7)}-${d.slice(7,10)}-${d.slice(10,14)}`;
+  }
+
+  function onPinInput(id) {
+    const inp = document.getElementById(`pin_${id}`);
+    // Auto-insert dashes as user types
+    let raw = stripPin(inp.value).slice(0, 14);
+    if (raw.length > 0) inp.value = formatPin(raw).replace(/_/g,'').slice(0, raw.length + Math.floor(raw.length/2));
+
+    // Reset status while typing
+    inp.classList.remove('valid','invalid');
+    setStatus(id, '', '');
+
+    // Debounce lookup
+    clearTimeout(lookupTimers[id]);
+    if (stripPin(inp.value).length === 14) {
+      lookupTimers[id] = setTimeout(() => validatePin(id), 600);
+    }
+  }
+
+  async function validatePin(id) {
+    const inp = document.getElementById(`pin_${id}`);
+    const raw = stripPin(inp.value);
+    if (!raw) { inp.classList.remove('valid','invalid'); setStatus(id,'',''); return; }
+    if (raw.length !== 14) {
+      inp.classList.add('invalid'); inp.classList.remove('valid');
+      setStatus(id, `${raw.length}/14 digits`, 'err');
+      return;
+    }
+
+    setStatus(id, 'Checking…', 'loading');
+    try {
+      const res = await fetch('/lookup-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: raw })
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || `Not found`);
+      }
+      const data = await res.json();
+      inp.classList.add('valid'); inp.classList.remove('invalid');
+      const addr = data.address || '';
+      setStatus(id, addr ? addr.slice(0,28) + (addr.length>28?'…':'') : '✓ Found', 'ok');
+    } catch(e) {
+      inp.classList.add('invalid'); inp.classList.remove('valid');
+      setStatus(id, e.message.slice(0,30), 'err');
+    }
+  }
+
+  function setStatus(id, msg, type) {
+    const el = document.getElementById(`status_${id}`);
+    el.textContent = msg;
+    el.className = 'pin-status' + (type ? ' '+type : '');
+  }
+
+  // ── Clear ─────────────────────────────────────────────────────────────────
+  function clearAll() {
+    PROPERTIES.forEach(p => {
+      const inp = document.getElementById(`pin_${p.id}`);
+      inp.value = '';
+      inp.classList.remove('valid','invalid');
+      setStatus(p.id, '', '');
+    });
+    document.getElementById('globalStatus').textContent = '';
+    document.getElementById('progressWrap').classList.remove('active');
+    document.getElementById('resultBar').classList.remove('visible');
+    pdfBlob = null;
+  }
+
+  // ── Generate PDF ──────────────────────────────────────────────────────────
+  async function generatePDF() {
+    const properties = PROPERTIES.map(p => ({
+      label: p.label,
+      pin:   stripPin(document.getElementById(`pin_${p.id}`).value)
+    })).filter(p => p.pin.length > 0);
+
+    if (!properties.length) {
+      setGlobalStatus('Please enter at least one PIN.', 'err');
+      return;
+    }
+
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true;
+    pdfBlob = null;
+    document.getElementById('resultBar').classList.remove('visible');
+    setGlobalStatus('');
+
+    // Setup progress UI
+    const wrap  = document.getElementById('progressWrap');
+    const steps = document.getElementById('progressSteps');
+    wrap.classList.add('active');
+    steps.innerHTML = '';
+
+    const totalSteps = properties.length * 2 + 1; // lookup + capture + build
+    let done = 0;
+
+    function addStep(text, state = '') {
+      const row = document.createElement('div');
+      row.className = 'step-row' + (state ? ' '+state : '');
+      row.innerHTML = `<div class="step-dot"></div><span>${text}</span>`;
+      steps.appendChild(row);
+      return row;
+    }
+
+    function updateProgress() {
+      done++;
+      document.getElementById('progressFill').style.width =
+        Math.round((done / totalSteps) * 100) + '%';
+    }
+
+    // Add pending rows
+    const stepRows = {};
+    properties.forEach(p => {
+      stepRows[p.label + '_lookup']  = addStep(`Looking up PIN for ${p.label}…`);
+      stepRows[p.label + '_capture'] = addStep(`Capturing street view for ${p.label}…`);
+    });
+    const buildRow = addStep('Building combined PDF…');
+
+    setGlobalStatus(`Processing ${properties.length} propert${properties.length>1?'ies':'y'}…`, 'warn');
+
+    try {
+      // Mark lookup steps active
+      properties.forEach(p => {
+        stepRows[p.label+'_lookup'].classList.add('active');
+      });
+
+      const res = await fetch('/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ properties })
+      });
+
+      // Mark all steps done (server does everything in one call)
+      properties.forEach(p => {
+        const lr = stepRows[p.label+'_lookup'];
+        const cr = stepRows[p.label+'_capture'];
+        lr.classList.remove('active'); lr.classList.add('done');
+        lr.querySelector('span').textContent = `✓ PIN lookup: ${p.label}`;
+        cr.classList.remove('active'); cr.classList.add('done');
+        cr.querySelector('span').textContent = `✓ Street view: ${p.label}`;
+        updateProgress(); updateProgress();
+      });
+      buildRow.classList.add('active');
+
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || `Server error ${res.status}`);
+      }
+
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('pdf')) {
+        const body = await res.text();
+        throw new Error('Unexpected response: ' + ct + '\n' + body.slice(0, 200));
+      }
+
+      pdfBlob = await res.blob();
+      updateProgress();
+      buildRow.classList.remove('active'); buildRow.classList.add('done');
+      buildRow.querySelector('span').textContent = `✓ PDF built (${(pdfBlob.size/1024).toFixed(0)} KB)`;
+
+      const warn = res.headers.get('X-Warnings');
+      if (warn) {
+        setGlobalStatus('⚠ ' + warn, 'warn');
+      } else {
+        setGlobalStatus(`PDF ready — ${properties.length} page(s) generated.`, 'ok');
+      }
+
+      const infoEl = document.getElementById('resultInfo');
+      infoEl.innerHTML = `<span>✓</span> PDF ready &mdash; ${properties.length} page(s)`;
+      document.getElementById('resultBar').classList.add('visible');
+
+    } catch(e) {
+      setGlobalStatus('Error: ' + e.message, 'err');
+      console.error(e);
+      // Mark remaining steps failed
+      Object.values(stepRows).forEach(r => {
+        if (!r.classList.contains('done')) r.classList.add('failed');
+      });
+      if (!buildRow.classList.contains('done')) buildRow.classList.add('failed');
+    }
+
+    btn.disabled = false;
+  }
+
+  function downloadPDF() {
+    if (!pdfBlob) return;
+    const url = URL.createObjectURL(pdfBlob);
+    const a   = document.createElement('a');
+    a.href     = url;
+    a.download = 'streetview_properties.pdf';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function setGlobalStatus(msg, type='') {
+    const el = document.getElementById('globalStatus');
+    el.textContent = msg;
+    el.className   = 'global-status' + (type ? ' '+type : '');
+  }
+</script>
+</body>
+</html>
